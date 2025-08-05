@@ -1,0 +1,2 @@
+[STDERR 2025-08-04T03:03:38.955Z] node: --trace-exits is not allowed in NODE_OPTIONS
+[EXIT 2025-08-04T03:03:38.961Z] Process exited: code=9, signal=null

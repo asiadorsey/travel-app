@@ -1,26 +1,116 @@
-@import "tailwindcss";
+/* src/app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Tailwind custom properties for colors */
+  --color-talea-mint: #57A57A;
+  --color-talea-rose-taupe: #9D5C63;
+  --color-talea-dark-green: #00241B;
+  --color-talea-dark-slate-gray: #254441;
+  --color-talea-dun: #DCC9B6;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))) rgb(var(--background-start-rgb));
+}
+
+/* Custom scrollbar for category navigation */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+/* Custom styles for react-masonry-css */
+.my-masonry-grid {
+  display: flex;
+  margin-left: -20px;
+  /* gutter-size */
+  width: auto;
+}
+
+.my-masonry-grid_column {
+  padding-left: 20px;
+  /* gutter-size */
+  background-clip: padding-box;
+}
+
+.my-masonry-grid_column>div {
+  margin-bottom: 20px;
+}
+
+/* Global Animations (defined here as a fallback/redundancy if Tailwind config doesn't pick them up immediately) */
+@keyframes pulse-border {
+  0% {
+    border-color: var(--color-talea-mint);
+    box-shadow: 0 0 15px var(--color-talea-mint);
+  }
+
+  50% {
+    border-color: var(--color-talea-rose-taupe);
+    box-shadow: 0 0 25px var(--color-talea-rose-taupe);
+  }
+
+  100% {
+    border-color: var(--color-talea-mint);
+    box-shadow: 0 0 15px var(--color-talea-mint);
+  }
+}
+
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes card-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-pulse-border {
+  animation: pulse-border 4s ease-in-out infinite;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 1s ease-out forwards;
+}
+
+.animate-card-fade-in {
+  animation: card-fade-in 0.8s ease-out forwards;
 }
