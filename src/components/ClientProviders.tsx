@@ -2,7 +2,9 @@
 "use client";
 
 import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback, useRef, MutableRefObject } from 'react';
-import { SavedTalesProvider } from '@/context/SavedTalesContext';
+import { SavedTalesProvider, useSavedTales } from '@/context/SavedTalesContext';
+import TierUpgradeModal from './TierUpgradeModal';
+import Toast from './Toast';
 
 // Define the shape of our Firebase context value (keeping same interface for compatibility)
 interface FirebaseContextType {
@@ -215,11 +217,57 @@ const FirebaseProvider: React.FC<FirebaseProviderProps> = ({ children }) => {
     );
 };
 
+// Modal and Toast wrapper component
+const ModalAndToastWrapper: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const { 
+        isModalOpen, 
+        modalTriggerType, 
+        closeModal, 
+        trialInfo, 
+        refreshUserTier,
+        notifications,
+        showNotification 
+    } = useSavedTales();
+
+    const removeNotification = (id: string) => {
+        // This will be handled by the auto-removal in the context
+        // But we can also provide manual removal if needed
+    };
+
+    return (
+        <>
+            {children}
+            
+            {/* Tier Upgrade Modal */}
+            <TierUpgradeModal
+                isOpen={isModalOpen}
+                onClose={closeModal}
+                triggerType={modalTriggerType}
+                trialInfo={trialInfo}
+                refreshUserTier={refreshUserTier}
+            />
+            
+            {/* Toast Container */}
+            <div className="fixed top-4 right-4 z-50 space-y-2">
+                {notifications.map((notification) => (
+                    <Toast
+                        key={notification.id}
+                        {...notification}
+                        onClose={removeNotification}
+                    />
+                ))}
+            </div>
+        </>
+    );
+};
+
 export const ClientProviders: React.FC<{ children: ReactNode }> = ({ children }) => {
     return (
         <FirebaseProvider>
             <SavedTalesProvider>
-                {children}
+                <ModalAndToastWrapper>
+                    {children}
+                </ModalAndToastWrapper>
             </SavedTalesProvider>
         </FirebaseProvider>
     );
