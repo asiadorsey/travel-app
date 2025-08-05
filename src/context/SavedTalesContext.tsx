@@ -5,6 +5,14 @@ import React, { createContext, useState, useEffect, useContext, ReactNode, useCa
 import { useFirebase } from '@/components/ClientProviders';
 import { getCurrentTier, canSaveItem } from '@/utils/tierLogic';
 
+interface Notification {
+    id: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    timestamp: number;
+}
+
 interface SavedTalesContextType {
     savedTaleIds: Set<string>;
     onToggleSave: (taleId: string) => Promise<void>;
@@ -15,6 +23,22 @@ interface SavedTalesContextType {
     trialRemainingSaves: number;
     isTrialExpired: boolean;
     isPremiumUser: boolean;
+    // Modal controls
+    isModalOpen: boolean;
+    modalTriggerType: 'save-limit' | 'ai-limit' | 'upgrade-button' | 'default';
+    openModal: (triggerType: 'save-limit' | 'ai-limit' | 'upgrade-button' | 'default') => void;
+    closeModal: () => void;
+    // Notifications
+    notifications: Notification[];
+    showNotification: (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string) => void;
+    isLoading: boolean;
+    // Trial info for modal
+    trialInfo: {
+        usedSaves: number;
+        maxSaves: number;
+    };
+    // Refresh user tier for upgrade simulation
+    refreshUserTier: () => void;
 }
 
 const SavedTalesContext = createContext<SavedTalesContextType | undefined>(undefined);
@@ -37,15 +61,90 @@ export const SavedTalesProvider: React.FC<SavedTalesProviderProps> = ({ children
         isAuthReady,
         trialRemainingSaves,
         isTrialExpired,
-        isPremiumUser,
+        isPremiumUser: firebasePremiumUser,
         decrementTrialSave,
         currentUser,
     } = useFirebase(); // Get all necessary state from local auth
+    
     const [savedTaleIds, setSavedTaleIds] = useState<Set<string>>(new Set());
     const [loadingSavedTales, setLoadingSavedTales] = useState(true);
     const [savedTalesError, setSavedTalesError] = useState<string | null>(null);
+    
+    // Modal state
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalTriggerType, setModalTriggerType] = useState<'save-limit' | 'ai-limit' | 'upgrade-button' | 'default'>('default');
+    
+    // Notification state
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    
+    // Enhanced premium detection that includes localStorage check
+    const [isPremiumUser, setIsPremiumUser] = useState(firebasePremiumUser);
+    
+    // Check for premium status from localStorage on mount and when user changes
+    useEffect(() => {
+        const checkPremiumStatus = () => {
+            const localTier = localStorage.getItem('userTier');
+            const upgradeDate = localStorage.getItem('upgradeDate');
+            
+            if (localTier === 'premium' && upgradeDate) {
+                console.log('🔄 Premium status detected from localStorage');
+                setIsPremiumUser(true);
+            } else {
+                setIsPremiumUser(firebasePremiumUser);
+            }
+        };
+        
+        checkPremiumStatus();
+    }, [firebasePremiumUser, currentUser]);
 
     const currentTier = getCurrentTier(currentUser, isPremiumUser); // Determine current tier
+    
+    // Calculate trial info for modal
+    const maxTrialSaves = 3;
+    const usedSaves = maxTrialSaves - trialRemainingSaves;
+    const trialInfo = {
+        usedSaves: Math.max(0, usedSaves),
+        maxSaves: maxTrialSaves
+    };
+
+    // Modal controls
+    const openModal = (triggerType: 'save-limit' | 'ai-limit' | 'upgrade-button' | 'default') => {
+        setModalTriggerType(triggerType);
+        setIsModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsModalOpen(false);
+    };
+
+    // Notification function
+    const showNotification = (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string) => {
+        const notification: Notification = {
+            id: Date.now().toString(),
+            type,
+            title,
+            message,
+            timestamp: Date.now()
+        };
+        
+        setNotifications(prev => [...prev, notification]);
+        console.log(`🔔 ${type.toUpperCase()}: ${title} - ${message}`);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            setNotifications(prev => prev.filter(n => n.id !== notification.id));
+        }, 5000);
+    };
+
+    // Refresh user tier function for upgrade simulation
+    const refreshUserTier = () => {
+        const localTier = localStorage.getItem('userTier');
+        if (localTier === 'premium') {
+            setIsPremiumUser(true);
+            console.log('🔄 User tier refreshed to premium');
+        }
+    };
 
     // Effect to load saved tales from localStorage based on userId
     useEffect(() => {
@@ -77,7 +176,7 @@ export const SavedTalesProvider: React.FC<SavedTalesProviderProps> = ({ children
         }
     }, [userId, isAuthReady]); // Re-run when userId or auth readiness changes
 
-    // This function now toggles save state in localStorage with tier logic
+    // This function now toggles save state in localStorage with tier logic and shows modal when needed
     const onToggleSave = useCallback(async (taleId: string) => {
         if (!userId) {
             console.error("Attempted to toggle save but userId was not ready.");
@@ -94,13 +193,8 @@ export const SavedTalesProvider: React.FC<SavedTalesProviderProps> = ({ children
         // Only apply limit logic if the user is attempting to SAVE (not unsave)
         if (!currentSavedIds.has(taleId)) { // User is trying to save a new item
             if (!canSaveItem(currentTier, trialRemainingSaves)) {
-                // Determine specific error message based on tier and remaining saves
-                if (currentTier === 'anonymous' && trialRemainingSaves <= 0) {
-                    setSavedTalesError("You've used all your free saves! Please sign up or upgrade to save more items.");
-                } else if (currentTier === 'anonymous' && isTrialExpired) { // Should be covered by trialRemainingSaves <= 0, but good to be explicit
-                    setSavedTalesError("Your trial has expired for saves! Please sign up or upgrade.");
-                }
-                // No message needed for freemium/premium if canSaveItem is false, as it should always be true for them.
+                // Show upgrade modal instead of just error message
+                openModal('save-limit');
                 return; // Prevent save
             }
 
@@ -111,22 +205,36 @@ export const SavedTalesProvider: React.FC<SavedTalesProviderProps> = ({ children
         }
         // --- END NEW TIER LOGIC ---
 
+        setIsLoading(true);
+
         try {
+            console.log('💾 Saving tale:', taleId);
+            
+            // Simulate save delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             if (currentSavedIds.has(taleId)) {
                 currentSavedIds.delete(taleId);
                 console.log(`Local Storage: Tale ${taleId} unsaved for user ${userId}.`);
+                showNotification('info', 'Removed', 'Item removed from your collection');
             } else {
                 currentSavedIds.add(taleId);
                 console.log(`Local Storage: Tale ${taleId} saved for user ${userId}.`);
+                showNotification('success', 'Saved!', 'Item added to your collection');
             }
+            
             // Update localStorage and component state
             localStorage.setItem(userSavedItemsKey, JSON.stringify(Array.from(currentSavedIds)));
             setSavedTaleIds(currentSavedIds); // Update state to trigger re-render
+            
         } catch (error: any) {
             console.error("Error toggling save state in local storage:", error);
             setSavedTalesError(`Failed to update saved status: ${error.message}`);
+            showNotification('error', 'Save Failed', 'Could not save item. Please try again.');
+        } finally {
+            setIsLoading(false);
         }
-    }, [userId, savedTaleIds, currentTier, trialRemainingSaves, isTrialExpired, decrementTrialSave]); // Add new dependencies
+    }, [userId, savedTaleIds, currentTier, trialRemainingSaves, isTrialExpired, decrementTrialSave, openModal, showNotification]); // Add new dependencies
 
     const contextValue = {
         savedTaleIds,
@@ -138,6 +246,19 @@ export const SavedTalesProvider: React.FC<SavedTalesProviderProps> = ({ children
         trialRemainingSaves,
         isTrialExpired,
         isPremiumUser,
+        // --- Modal controls ---
+        isModalOpen,
+        modalTriggerType,
+        openModal,
+        closeModal,
+        // --- Notifications ---
+        notifications,
+        showNotification,
+        isLoading,
+        // --- Trial info ---
+        trialInfo,
+        // --- Refresh function ---
+        refreshUserTier,
         // --- END NEW TIER CONTEXT VALUES ---
     };
 
