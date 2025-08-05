@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 
 export default function Header() {
   const { currentUser, isAuthReady, signOutUser, signInAnonymously, firebaseError } = useFirebase();
-  const { currentTier, openModal } = useSavedTales();
+  const { currentTier, openModal, trialInfo } = useSavedTales();
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isSigningInAnonymously, setIsSigningInAnonymously] = useState(false);
@@ -77,45 +77,56 @@ export default function Header() {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md py-4 px-6 flex items-center justify-between">
-      <div className="flex items-center">
-        <div className="text-xl font-bold text-gray-800">Talea</div>
-      </div>
-      <nav className="flex items-center space-x-6">
-        <Link href="/" className="text-gray-600 hover:text-gray-900">
-          Home
-        </Link>
-        <Link href="/saved" className="text-gray-600 hover:text-gray-900">
-          My Saved Items
-        </Link>
-        
-        {/* Upgrade Button Section */}
-        <div className="flex items-center space-x-4">
-          {currentTier !== 'premium' && (
-            <button
-              onClick={() => openModal('upgrade-button')}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all duration-200 flex items-center gap-2 animate-pulse"
-            >
-              <Crown className="w-4 h-4" />
-              Upgrade
-            </button>
-          )}
-          
-          {currentTier === 'premium' && (
-            <div className="flex items-center gap-2 text-purple-600">
-              <Crown className="w-4 h-4" />
-              <span className="text-sm font-medium">Premium</span>
-            </div>
-          )}
-          
-          {renderAuthLinks()}
-        </div>
-      </nav>
-      {firebaseError && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg shadow-lg">
-          {firebaseError}
+    <>
+      {/* Development Debug Info */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed top-0 left-0 bg-black text-white text-xs p-2 z-50 rounded-br-lg">
+          <div>Tier: {currentTier}</div>
+          <div>Saves: {trialInfo?.usedSaves || 0}/{trialInfo?.maxSaves || 3}</div>
+          <div>User: {currentUser?.isAnonymous ? 'Anonymous' : 'Signed In'}</div>
         </div>
       )}
-    </header>
+
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md py-4 px-6 flex items-center justify-between">
+        <div className="flex items-center">
+          <div className="text-xl font-bold text-gray-800">Talea</div>
+        </div>
+        <nav className="flex items-center space-x-6">
+          <Link href="/" className="text-gray-600 hover:text-gray-900">
+            Home
+          </Link>
+          <Link href="/saved" className="text-gray-600 hover:text-gray-900">
+            My Saved Items
+          </Link>
+
+          {/* Upgrade Button Section */}
+          <div className="flex items-center space-x-4">
+            {currentTier !== 'premium' && (
+              <button
+                onClick={() => openModal('upgrade-button')}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all duration-200 flex items-center gap-2 animate-pulse"
+              >
+                <Crown className="w-4 h-4" />
+                Upgrade
+              </button>
+            )}
+
+            {currentTier === 'premium' && (
+              <div className="flex items-center gap-2 text-purple-600">
+                <Crown className="w-4 h-4" />
+                <span className="text-sm font-medium">Premium</span>
+              </div>
+            )}
+
+            {renderAuthLinks()}
+          </div>
+                </nav>
+        {firebaseError && (
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg shadow-lg">
+            {firebaseError}
+          </div>
+        )}
+      </header>
+    </>
   );
 }

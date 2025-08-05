@@ -4,6 +4,7 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
 import { useFirebase } from '@/components/ClientProviders';
 import { getCurrentTier, canSaveItem } from '@/utils/tierLogic';
+import { useAnalytics } from './AnalyticsContext';
 
 interface Notification {
     id: string;
@@ -65,28 +66,29 @@ export const SavedTalesProvider: React.FC<SavedTalesProviderProps> = ({ children
         decrementTrialSave,
         currentUser,
     } = useFirebase(); // Get all necessary state from local auth
-    
+    const { trackEvent } = useAnalytics();
+
     const [savedTaleIds, setSavedTaleIds] = useState<Set<string>>(new Set());
     const [loadingSavedTales, setLoadingSavedTales] = useState(true);
     const [savedTalesError, setSavedTalesError] = useState<string | null>(null);
-    
+
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalTriggerType, setModalTriggerType] = useState<'save-limit' | 'ai-limit' | 'upgrade-button' | 'default'>('default');
-    
+
     // Notification state
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    
+
     // Enhanced premium detection that includes localStorage check
     const [isPremiumUser, setIsPremiumUser] = useState(firebasePremiumUser);
-    
+
     // Check for premium status from localStorage on mount and when user changes
     useEffect(() => {
         const checkPremiumStatus = () => {
             const localTier = localStorage.getItem('userTier');
             const upgradeDate = localStorage.getItem('upgradeDate');
-            
+
             if (localTier === 'premium' && upgradeDate) {
                 console.log('🔄 Premium status detected from localStorage');
                 setIsPremiumUser(true);
@@ -94,12 +96,12 @@ export const SavedTalesProvider: React.FC<SavedTalesProviderProps> = ({ children
                 setIsPremiumUser(firebasePremiumUser);
             }
         };
-        
+
         checkPremiumStatus();
     }, [firebasePremiumUser, currentUser]);
 
     const currentTier = getCurrentTier(currentUser, isPremiumUser); // Determine current tier
-    
+
     // Calculate trial info for modal
     const maxTrialSaves = 3;
     const usedSaves = maxTrialSaves - trialRemainingSaves;
@@ -112,6 +114,14 @@ export const SavedTalesProvider: React.FC<SavedTalesProviderProps> = ({ children
     const openModal = (triggerType: 'save-limit' | 'ai-limit' | 'upgrade-button' | 'default') => {
         setModalTriggerType(triggerType);
         setIsModalOpen(true);
+
+        // Track modal view
+        trackEvent('modal_view', {
+            triggerType,
+            userTier: currentTier,
+            trialSavesUsed: trialInfo.usedSaves,
+            trialSavesRemaining: trialInfo.maxSaves - trialInfo.usedSaves
+        });
     };
 
     const closeModal = () => {
@@ -127,10 +137,10 @@ export const SavedTalesProvider: React.FC<SavedTalesProviderProps> = ({ children
             message,
             timestamp: Date.now()
         };
-        
+
         setNotifications(prev => [...prev, notification]);
         console.log(`🔔 ${type.toUpperCase()}: ${title} - ${message}`);
-        
+
         // Auto-remove after 5 seconds
         setTimeout(() => {
             setNotifications(prev => prev.filter(n => n.id !== notification.id));
@@ -193,6 +203,15 @@ export const SavedTalesProvider: React.FC<SavedTalesProviderProps> = ({ children
         // Only apply limit logic if the user is attempting to SAVE (not unsave)
         if (!currentSavedIds.has(taleId)) { // User is trying to save a new item
             if (!canSaveItem(currentTier, trialRemainingSaves)) {
+                // Track feature blocked
+                trackEvent('feature_blocked', {
+                    feature: 'save',
+                    userTier: currentTier,
+                    reason: 'trial_limit_reached',
+                    trialSavesUsed: trialInfo.usedSaves,
+                    trialSavesRemaining: trialInfo.maxSaves - trialInfo.usedSaves
+                });
+
                 // Show upgrade modal instead of just error message
                 openModal('save-limit');
                 return; // Prevent save
@@ -209,7 +228,7 @@ export const SavedTalesProvider: React.FC<SavedTalesProviderProps> = ({ children
 
         try {
             console.log('💾 Saving tale:', taleId);
-            
+
             // Simulate save delay
             await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -217,16 +236,34 @@ export const SavedTalesProvider: React.FC<SavedTalesProviderProps> = ({ children
                 currentSavedIds.delete(taleId);
                 console.log(`Local Storage: Tale ${taleId} unsaved for user ${userId}.`);
                 showNotification('info', 'Removed', 'Item removed from your collection');
+
+                // Track unsave
+                trackEvent('save_attempt', {
+                    action: 'unsave',
+                    success: true,
+                    userTier: currentTier,
+                    taleId
+                });
             } else {
                 currentSavedIds.add(taleId);
                 console.log(`Local Storage: Tale ${taleId} saved for user ${userId}.`);
                 showNotification('success', 'Saved!', 'Item added to your collection');
+
+                // Track save
+                trackEvent('save_attempt', {
+                    action: 'save',
+                    success: true,
+                    userTier: currentTier,
+                    trialSavesUsed: trialInfo.usedSaves,
+                    trialSavesRemaining: trialInfo.maxSaves - trialInfo.usedSaves,
+                    taleId
+                });
             }
-            
+
             // Update localStorage and component state
             localStorage.setItem(userSavedItemsKey, JSON.stringify(Array.from(currentSavedIds)));
             setSavedTaleIds(currentSavedIds); // Update state to trigger re-render
-            
+
         } catch (error: any) {
             console.error("Error toggling save state in local storage:", error);
             setSavedTalesError(`Failed to update saved status: ${error.message}`);

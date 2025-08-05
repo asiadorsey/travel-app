@@ -3,8 +3,11 @@
 
 import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback, useRef, MutableRefObject } from 'react';
 import { SavedTalesProvider, useSavedTales } from '@/context/SavedTalesContext';
+import { AnalyticsProvider, useAnalytics } from '@/context/AnalyticsContext';
 import TierUpgradeModal from './TierUpgradeModal';
 import Toast from './Toast';
+import AnalyticsDashboard from './AnalyticsDashboard';
+import '../utils/testHelpers'; // Import testing utilities
 
 // Define the shape of our Firebase context value (keeping same interface for compatibility)
 interface FirebaseContextType {
@@ -52,12 +55,12 @@ const useLocalAuth = () => {
     const [currentUser, setCurrentUser] = useState<any | null>(null); // 'any' for simplicity, could be more specific
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [firebaseError, setFirebaseError] = useState<string | null>(null); // Keep for consistency, will always be null
-    
+
     // Trial state management
     const [trialRemainingSaves, setTrialRemainingSaves] = useState(3); // Initial free saves
     const [isTrialExpired, setIsTrialExpired] = useState(false);
     const [isPremiumUser, setIsPremiumUser] = useState(false);
-    
+
     // AI Companion usage tracking
     const [aiUsageToday, setAiUsageToday] = useState(0);
     const [lastAiUsageDate, setLastAiUsageDate] = useState<string>('');
@@ -182,7 +185,7 @@ const useLocalAuth = () => {
     console.log('isAuthReady:', isAuthReady);
     console.log('currentUser in useLocalAuth:', currentUser);
     console.log('Trial state:', { trialRemainingSaves, isTrialExpired, isPremiumUser });
-    
+
     return {
         db: null, // No Firestore DB instance in local auth
         auth: null, // No Firebase Auth instance in local auth
@@ -219,15 +222,29 @@ const FirebaseProvider: React.FC<FirebaseProviderProps> = ({ children }) => {
 
 // Modal and Toast wrapper component
 const ModalAndToastWrapper: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { 
-        isModalOpen, 
-        modalTriggerType, 
-        closeModal, 
-        trialInfo, 
+    const {
+        isModalOpen,
+        modalTriggerType,
+        closeModal,
+        trialInfo,
         refreshUserTier,
         notifications,
-        showNotification 
+        showNotification
     } = useSavedTales();
+    const { trackEvent } = useAnalytics();
+
+    // Track session start only once on mount
+    useEffect(() => {
+        const hasTrackedSession = sessionStorage.getItem('session_tracked');
+        if (!hasTrackedSession) {
+            trackEvent('session_start', {
+                userTier: 'anonymous', // Will be updated by context
+                referrer: document.referrer,
+                url: window.location.href
+            });
+            sessionStorage.setItem('session_tracked', 'true');
+        }
+    }, []); // Empty dependency array - only run once on mount
 
     const removeNotification = (id: string) => {
         // This will be handled by the auto-removal in the context
@@ -237,7 +254,7 @@ const ModalAndToastWrapper: React.FC<{ children: ReactNode }> = ({ children }) =
     return (
         <>
             {children}
-            
+
             {/* Tier Upgrade Modal */}
             <TierUpgradeModal
                 isOpen={isModalOpen}
@@ -246,7 +263,7 @@ const ModalAndToastWrapper: React.FC<{ children: ReactNode }> = ({ children }) =
                 trialInfo={trialInfo}
                 refreshUserTier={refreshUserTier}
             />
-            
+
             {/* Toast Container */}
             <div className="fixed top-4 right-4 z-50 space-y-2">
                 {notifications.map((notification) => (
@@ -257,6 +274,9 @@ const ModalAndToastWrapper: React.FC<{ children: ReactNode }> = ({ children }) =
                     />
                 ))}
             </div>
+
+            {/* Analytics Dashboard (Development Only) */}
+            <AnalyticsDashboard />
         </>
     );
 };
@@ -264,11 +284,13 @@ const ModalAndToastWrapper: React.FC<{ children: ReactNode }> = ({ children }) =
 export const ClientProviders: React.FC<{ children: ReactNode }> = ({ children }) => {
     return (
         <FirebaseProvider>
-            <SavedTalesProvider>
-                <ModalAndToastWrapper>
-                    {children}
-                </ModalAndToastWrapper>
-            </SavedTalesProvider>
+            <AnalyticsProvider>
+                <SavedTalesProvider>
+                    <ModalAndToastWrapper>
+                        {children}
+                    </ModalAndToastWrapper>
+                </SavedTalesProvider>
+            </AnalyticsProvider>
         </FirebaseProvider>
     );
 };
