@@ -1,0 +1,57 @@
+{
+    "name": "Travel App Vite Development",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    },
+    "forwardPorts": [
+        5173,
+        3000
+    ],
+    "portsAttributes": {
+        "5173": {
+            "label": "Vite Dev Server",
+            "onAutoForward": "openPreview"
+        },
+        "3000": {
+            "label": "Alternative Dev Port",
+            "onAutoForward": "notify"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "bradlc.vscode-tailwindcss",
+                "esbenp.prettier-vscode",
+                "ms-vscode.vscode-typescript-next",
+                "ms-vscode.vscode-json",
+                "formulahendry.auto-rename-tag",
+                "christian-kohler.path-intellisense",
+                "ms-vscode.vscode-eslint",
+                "dbaeumer.vscode-eslint",
+                "ms-vscode.vscode-js-debug",
+                "ms-vscode.vscode-js-debug-companion"
+            ],
+            "settings": {
+                "typescript.preferences.importModuleSpecifier": "relative",
+                "editor.formatOnSave": true,
+                "editor.defaultFormatter": "esbenp.prettier-vscode",
+                "editor.codeActionsOnSave": {
+                    "source.fixAll.eslint": "explicit"
+                },
+                "tailwindCSS.includeLanguages": {
+                    "javascript": "javascript",
+                    "javascriptreact": "javascriptreact"
+                }
+            }
+        }
+    },
+    "postCreateCommand": "npm install",
+    "postStartCommand": "npm run dev",
+    "remoteUser": "node",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+    "workspaceFolder": "/workspace"
+}
