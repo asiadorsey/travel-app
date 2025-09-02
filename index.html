@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Talea | Your Personal Travel Concierge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f3f0;
+            color: #2c2c2c;
+            /* Using a gradient to match the subtle background in the reference image */
+            background-image: linear-gradient(to bottom right, #f2f3f7, #e6e9f0);
+        }
+        .neumorphic-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px); /* For Safari */
+            border-radius: 2rem;
+            box-shadow: 
+                20px 20px 60px #d4d7dd,
+                -20px -20px 60px #ffffff;
+        }
+        .btn-primary {
+            background-color: #5A67D8; /* A shade of purple from the reference image */
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .btn-primary:hover {
+            background-color: #434190;
+            transform: scale(1.02);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .input-field {
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease-in-out;
+        }
+        .input-field:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.4);
+            border-color: #6366f1;
+        }
+        .carousel {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        .carousel-item {
+            display: none;
+            width: 100%;
+            height: auto;
+            border-radius: 1rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            animation: fadeIn 1s ease-in-out;
+        }
+        .carousel-item.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <div class="container mx-auto p-8 neumorphic-card text-center max-w-4xl">
+        <div class="mb-4">
+            <h1 class="text-xl md:text-2xl font-bold tracking-tight text-gray-800">Talea</h1>
+            <div class="mt-2 text-sm text-gray-500 font-medium px-4 py-1.5 inline-block rounded-full bg-gray-200">
+                Coming soon in 2025
+            </div>
+        </div>
+        
+        <h2 class="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-4 text-gray-900 leading-tight">
+            Be the first to try.
+        </h2>
+        <p class="text-lg md:text-xl text-gray-600 mb-8 max-w-xl mx-auto">
+            We're almost ready to launch! Sign up for early access to Talea and be the first to get your hands on it when we go live.
+        </p>
+
+        <form id="waitlistForm" class="flex flex-col md:flex-row justify-center items-center gap-4 mb-12">
+            <input type="email" id="email" name="email" placeholder="Enter your email" required
+                   class="input-field w-full md:w-80 px-5 py-4 rounded-full text-gray-800">
+            <button type="submit"
+                    class="btn-primary w-full md:w-auto px-8 py-4 text-lg text-white font-semibold rounded-full">
+                Sign Up
+            </button>
+        </form>
+
+        <!-- Product mockup carousel section -->
+        <div class="flex justify-center items-center p-4">
+            <div id="app-carousel" class="carousel w-full max-w-2xl mx-auto">
+                <img src="https://placehold.co/1000x600/E5E7EB/4B5563?text=Discovery+Board" alt="App preview of the Discovery Board" class="carousel-item active">
+                <img src="https://placehold.co/1000x600/E5E7EB/4B5563?text=Trip+Itinerary" alt="App preview of the Trip Itinerary" class="carousel-item">
+                <img src="https://placehold.co/1000x600/E5E7EB/4B5563?text=My+Trips" alt="App preview of the My Trips page" class="carousel-item">
+                <img src="https://placehold.co/1000x600/E5E7EB/4B5563?text=Experience+Modal" alt="App preview of an experience modal" class="carousel-item">
+            </div>
+        </div>
+
+        <p id="message" class="mt-4 text-sm text-gray-500 hidden">Thanks for joining! We'll be in touch soon.</p>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, addDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // IMPORTANT: The following global variables are automatically provided by the environment.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Ensure firebaseConfig is not empty
+        if (Object.keys(firebaseConfig).length === 0) {
+            console.error("Firebase configuration is not available. Firestore operations will not work.");
+            document.getElementById('waitlistForm').style.display = 'none';
+            document.getElementById('message').innerText = 'Something went wrong. Please try again later.';
+            document.getElementById('message').classList.remove('hidden');
+        }
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Sign in anonymously to access Firestore
+        async function authenticate() {
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Authentication error:", error);
+            }
+        }
+
+        authenticate().then(() => {
+            const form = document.getElementById('waitlistForm');
+            const emailInput = document.getElementById('email');
+            const messageDiv = document.getElementById('message');
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const email = emailInput.value;
+                if (!email) return;
+
+                const userId = auth.currentUser?.uid || 'anonymous';
+                const now = new Date();
+
+                // Path for public data
+                const collectionPath = `artifacts/${appId}/public/data/waitlist`;
+
+                try {
+                    await addDoc(collection(db, collectionPath), {
+                        email: email,
+                        joinedAt: now,
+                        userId: userId
+                    });
+
+                    form.style.display = 'none';
+                    messageDiv.innerText = 'Thanks for joining! We’ll be in touch soon.';
+                    messageDiv.classList.remove('hidden');
+
+                } catch (error) {
+                    console.error("Error adding document: ", error);
+                    messageDiv.innerText = 'Something went wrong. Please try again later.';
+                    messageDiv.classList.remove('hidden');
+                }
+            });
+        }).catch(err => {
+            console.error("Authentication failed or Firestore not initialized:", err);
+        });
+
+        // Image carousel logic
+        let carouselIndex = 0;
+        const carouselItems = document.querySelectorAll('.carousel-item');
+        const showNextSlide = () => {
+            carouselItems[carouselIndex].classList.remove('active');
+            carouselIndex = (carouselIndex + 1) % carouselItems.length;
+            carouselItems[carouselIndex].classList.add('active');
+        };
+
+        // Change slide every 5 seconds
+        setInterval(showNextSlide, 5000);
+    </script>
+</body>
+</html>
